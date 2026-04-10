@@ -112,30 +112,57 @@ footer { text-align: center; padding: 2rem; font-size: 0.73rem; color: var(--mut
 const CSV_URL = 'torrefacoes.csv';
 
 function parseCSV(text) {
+  const rows = [];
+  // Normalize line endings
+  const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  
+  function parseLine(line) {
+    const cols = [];
+    let i = 0;
+    while (i < line.length) {
+      if (line[i] === '"') {
+        // Quoted field
+        i++; // skip opening quote
+        let cell = '';
+        while (i < line.length) {
+          if (line[i] === '"' && line[i+1] === '"') {
+            cell += '"'; i += 2; // escaped quote
+          } else if (line[i] === '"') {
+            i++; break; // closing quote
+          } else {
+            cell += line[i++];
+          }
+        }
+        cols.push(cell.trim());
+        if (line[i] === ',') i++; // skip comma
+      } else {
+        // Unquoted field
+        let cell = '';
+        while (i < line.length && line[i] !== ',') cell += line[i++];
+        cols.push(cell.trim());
+        if (line[i] === ',') i++;
+      }
+    }
+    return cols;
+  }
+
+  // Split into lines respecting quoted newlines
   const lines = [];
   let cur = '', inQ = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (c === '"') { inQ = !inQ; }
+  for (let i = 0; i < normalized.length; i++) {
+    const c = normalized[i];
+    if (c === '"') { inQ = !inQ; cur += c; }
     else if (c === '\n' && !inQ) { lines.push(cur); cur = ''; }
     else { cur += c; }
   }
   if (cur.trim()) lines.push(cur);
 
-  const rows = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
-    const cols = [];
-    let cell = '', q = false;
-    for (let j = 0; j < line.length; j++) {
-      const c = line[j];
-      if (c === '"') { q = !q; }
-      else if (c === ',' && !q) { cols.push(cell.trim()); cell = ''; }
-      else { cell += c; }
-    }
-    cols.push(cell.trim());
-    if (cols[0]) rows.push({
+    const cols = parseLine(line);
+    if (!cols[0]) continue;
+    rows.push({
       nome: cols[0] || '',
       ig: (cols[1] || '').trim(),
       site: (cols[2] || '').trim(),
